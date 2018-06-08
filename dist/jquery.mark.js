@@ -442,16 +442,29 @@
     }, {
       key: 'createSynonymsRegExp',
       value: function createSynonymsRegExp(str) {
+        var _this = this;
+
         var syn = this.opt.synonyms,
-            sens = this.opt.caseSensitive ? '' : 'i',
-            joinerPlaceholder = this.opt.ignoreJoiners || this.opt.ignorePunctuation.length ? '\0' : '';
+            sens = this.opt.caseSensitive ? '' : 'i';
         for (var index in syn) {
           if (syn.hasOwnProperty(index)) {
-            var value = syn[index],
-                k1 = this.opt.wildcards !== 'disabled' ? this.setupWildcardsRegExp(index) : this.escapeStr(index),
-                k2 = this.opt.wildcards !== 'disabled' ? this.setupWildcardsRegExp(value) : this.escapeStr(value);
-            if (k1 !== '' && k2 !== '') {
-              str = str.replace(new RegExp('(' + this.escapeStr(k1) + '|' + this.escapeStr(k2) + ')', 'gm' + sens), joinerPlaceholder + ('(' + this.processSynonyms(k1) + '|') + (this.processSynonyms(k2) + ')') + joinerPlaceholder);
+            var keys = Array.isArray(syn[index]) ? syn[index] : [syn[index]];
+            keys.unshift(index);
+            keys = keys.map(function (key) {
+              if (_this.opt.wildcards !== 'disabled') {
+                key = _this.setupWildcardsRegExp(key);
+              }
+              key = _this.escapeStr(key);
+              return key;
+            }).filter(function (k) {
+              return k !== '';
+            });
+            if (keys.length > 1) {
+              str = str.replace(new RegExp('(' + keys.map(function (k) {
+                return _this.escapeStr(k);
+              }).join('|') + ')', 'gm' + sens), '(' + keys.map(function (k) {
+                return _this.processSynonyms(k);
+              }).join('|') + ')');
             }
           }
         }
@@ -484,13 +497,15 @@
     }, {
       key: 'setupIgnoreJoinersRegExp',
       value: function setupIgnoreJoinersRegExp(str) {
-        return str.replace(/[^(|)\\]/g, function (val, indx, original) {
-          var nextChar = original.charAt(indx + 1);
-          if (/[(|)\\]/.test(nextChar) || nextChar === '') {
+        return str.replace(new RegExp('(' + '\\((?:\\?[:=!])?|\\|' + ')|' + '(' + '\\\\(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|.)' + '|' + '[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|.' + ')', 'g'), function (val, skip, pass, indx, original) {
+          if (typeof skip !== 'undefined') {
             return val;
-          } else {
-            return val + '\0';
           }
+          var postContext = original.slice(indx + val.length);
+          if (/^(?:[)|]|$)/.test(postContext)) {
+            return val;
+          }
+          return val + '\0';
         });
       }
     }, {
@@ -534,7 +549,7 @@
     }, {
       key: 'createAccuracyRegExp',
       value: function createAccuracyRegExp(str) {
-        var _this = this;
+        var _this2 = this;
 
         var chars = '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~¡¿';
         var acc = this.opt.accuracy,
@@ -542,7 +557,7 @@
             ls = typeof acc === 'string' ? [] : acc.limiters,
             lsJoin = '';
         ls.forEach(function (limiter) {
-          lsJoin += '|' + _this.escapeStr(limiter);
+          lsJoin += '|' + _this2.escapeStr(limiter);
         });
         switch (val) {
           case 'partially':
